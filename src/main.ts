@@ -3,9 +3,10 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { config } from 'dotenv';
 import * as bodyParser from 'body-parser';
+import { ENVIRONMENT } from './common/constant/enivronment/enviroment';
 config()
 
-const port = process.env.PORT || 4000;
+const port = ENVIRONMENT.CONNECTION.PORT || 4000;
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
