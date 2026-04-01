@@ -14,4 +14,8 @@ export const ENVIRONMENT = {
   OWNER: {
     OWNER_EMAIL: process.env.EMAIL_USER,
   },
+
+  TRON: {
+    API_KEY: process.env.TRON_API_KEY,
+  }
 };

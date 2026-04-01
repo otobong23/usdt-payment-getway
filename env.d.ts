@@ -6,6 +6,8 @@ declare namespace NodeJS {
     EMAIL_USER: string;
     EMAIL_PASS: string;
 
+    TRON_API_KEY: string;
+
     NODE_ENV: "development" | "production" | "test";
   }
 }
