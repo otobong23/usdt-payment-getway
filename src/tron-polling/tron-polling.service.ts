@@ -88,11 +88,32 @@ export class TronPollingService implements OnModuleInit {
   }
 
   onModuleInit() {
-    this.start();
+    this.startIndexer();
+    this.startConfirmer();
   }
 
-  private start() {
+  private startIndexer() {
     setInterval(() => this.run(), 5000); // every 5 seconds
+  }
+
+  private startConfirmer() {
+    setInterval(() => this.runConfirmation(), 10000); // every 10s (tunable)
+  }
+
+  private isConfirming = false;
+
+  private async runConfirmation() {
+    if (this.isConfirming) return;
+    this.isConfirming = true;
+
+    try {
+      const latestBlock = await this.getLatestBlockNumber();
+      await this.confirmTransactions(latestBlock);
+    } catch (err) {
+      this.logger.error('Confirmation error', err);
+    } finally {
+      this.isConfirming = false;
+    }
   }
 
   private isRunning = false;
@@ -117,7 +138,7 @@ export class TronPollingService implements OnModuleInit {
 
         await this.processBlock(block);
 
-        await this.confirmTransactions(latestBlock);
+        // await this.confirmTransactions(latestBlock);
 
         await this.updateLastBlock(i);
       }
@@ -173,15 +194,14 @@ export class TronPollingService implements OnModuleInit {
       const formattedAmount = this.formatUSDT(rawAmount);
 
       // filter transaction in relation to our wallet
-      if (to !== this.walletAddress){
+      if (to !== this.walletAddress) {
         this.logger.log(`Skipping TX ${txHash} - not related to our wallet`);
         return;
       }
-      
 
-      // You will refine this later for USDT specifically
+      // Save to DB
       await this.txModel.create({
-        txHash,
+        txHash, // unique index was added to prevent duplicates
         from,
         to,
         amount: formattedAmount,
@@ -197,17 +217,31 @@ export class TronPollingService implements OnModuleInit {
 
   private async confirmTransactions(latestBlock: number) {
     const CONFIRMATION_THRESHOLD = 19;
+    const BATCH_SIZE = 100;
 
     const pendingTxs = await this.txModel.find({
       status: 'PENDING',
       blockNumber: { $lte: latestBlock - CONFIRMATION_THRESHOLD }
-    });
+    })
+      .limit(BATCH_SIZE);
 
+    if (pendingTxs.length === 0) return;
+
+    await this.txModel.bulkWrite(
+      pendingTxs.map(tx => ({
+        updateOne: {
+          filter: { txHash: tx.txHash },
+          update: { $set: { status: 'CONFIRMED' } }
+        }
+      }))
+    );
+
+    // process side effects after
     for (const tx of pendingTxs) {
-      await this.txModel.updateOne(
-        { txHash: tx.txHash },
-        { status: 'CONFIRMED' }
-      );
+      // await this.txModel.updateOne(
+      //   { txHash: tx.txHash },
+      //   { status: 'CONFIRMED' }
+      // );
 
       //await this.sendWebhook(tx); // confirmed event
     }
