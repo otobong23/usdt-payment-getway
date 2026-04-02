@@ -38,14 +38,14 @@ export class TronPollingService implements OnModuleInit {
 
   // 1. Get the latest block number
   async getLatestBlockNumber(): Promise<number> {
-    const res = await this.authFeth.get(TronPollingEndpoints.getNowBlock);
+    const res = await this.authFeth.get(TronPollingEndpoints.getConfirmedNowBlock);
 
     return res.data.block_header.raw_data.number;
   }
 
   // 2. Get full block data by number
   async getBlockByNumber(blockNumber: number) {
-    const res = await this.authFeth.post(TronPollingEndpoints.getBlockByNum, {
+    const res = await this.authFeth.post(TronPollingEndpoints.getConfirmedBlockByNum, {
       num: blockNumber,
     });
     return res.data;
