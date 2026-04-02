@@ -1,18 +1,18 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 export const ENVIRONMENT = {
-  MAIL: {
-    SMTP_USER: process.env.EMAIL_USER,
-    AUTH_PASS: process.env.EMAIL_PASS,
-  },
+  // MAIL: {
+  //   SMTP_USER: process.env.EMAIL_USER,
+  //   AUTH_PASS: process.env.EMAIL_PASS,
+  // },
+
+  // OWNER: {
+  //   OWNER_EMAIL: process.env.EMAIL_USER,
+  // },
 
   CONNECTION: {
     PORT: process.env.PORT,
     MONGO_DB: process.env.MONGO_DB,
-  },
-
-  OWNER: {
-    OWNER_EMAIL: process.env.EMAIL_USER,
   },
 
   TRON: {
@@ -26,5 +26,7 @@ export const ENVIRONMENT = {
   WEBHOOK: {
     URL: process.env.WEBHOOK_URL,
     SECRET: process.env.WEBHOOK_SECRET
-  }
+  },
+
+  NODE_ENV: process.env.NODE_ENV || 'development'
 };
