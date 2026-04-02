@@ -24,6 +24,16 @@ export class TronTransaction {
 
   @Prop({ default: 'PENDING', enum: ['PENDING', 'CONFIRMED', 'FAILED'] })
   status: 'PENDING' | 'CONFIRMED' | 'FAILED';
+
+
+  @Prop({ type: String, enum: ['PENDING', 'SENT', 'FAILED'], default: 'PENDING' })
+  webhookStatus: string;
+
+  @Prop({ type: Number, default: 0 })
+  webhookAttempts: number;
+
+  @Prop()
+  lastWebhookError: String
 }
 
 export const TronTransactionSchema = SchemaFactory.createForClass(TronTransaction);

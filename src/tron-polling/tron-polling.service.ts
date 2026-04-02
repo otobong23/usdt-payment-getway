@@ -89,32 +89,14 @@ export class TronPollingService implements OnModuleInit {
 
   onModuleInit() {
     this.startIndexer();
-    this.startConfirmer();
+    // this.startConfirmer();
   }
 
   private startIndexer() {
     setInterval(() => this.run(), 5000); // every 5 seconds
   }
 
-  private startConfirmer() {
-    setInterval(() => this.runConfirmation(), 10000); // every 10s (tunable)
-  }
-
-  private isConfirming = false;
-
-  private async runConfirmation() {
-    if (this.isConfirming) return;
-    this.isConfirming = true;
-
-    try {
-      const latestBlock = await this.getLatestBlockNumber();
-      await this.confirmTransactions(latestBlock);
-    } catch (err) {
-      this.logger.error('Confirmation error', err);
-    } finally {
-      this.isConfirming = false;
-    }
-  }
+  
 
   private isRunning = false;
 
@@ -179,71 +161,118 @@ export class TronPollingService implements OnModuleInit {
       const contract = tx.raw_data.contract?.[0];
       if (!contract) return;
 
-      // Only smart contract calls
       if (contract.type !== 'TriggerSmartContract') return;
 
       const value = contract.parameter.value;
       const txHash = tx.txID;
 
+      // ✅ Ensure success
+      if (tx.ret?.[0]?.contractRet !== 'SUCCESS') return;
+
+      // ✅ Verify USDT contract
+      const USDT_CONTRACT = ENVIRONMENT.TRON.USDT_CONTRACT; // base58 format
+      const contractBase58 = this.toBase58(value.contract_address);
+      if (contractBase58 !== USDT_CONTRACT) return;
+
       const decoded = this.decodeTRC20(value.data);
       if (!decoded) return;
+
       const to = this.toBase58(decoded.to);
       const from = this.toBase58(value.owner_address);
+
+      // ✅ Only our wallet
+      if (to !== this.walletAddress) return;
 
       const rawAmount = decoded.amount;
       const formattedAmount = this.formatUSDT(rawAmount);
 
-      // filter transaction in relation to our wallet
-      if (to !== this.walletAddress) {
-        this.logger.log(`Skipping TX ${txHash} - not related to our wallet`);
-        return;
-      }
+      // ✅ Idempotent insert
+      await this.txModel.updateOne(
+        { txHash },
+        {
+          $setOnInsert: {
+            from,
+            to,
+            amount: formattedAmount,
+            blockNumber: tx.blockNumber,
+            confirmAtBlock: tx.blockNumber + 19,
+            //status: 'PENDING', // we can directly mark as CONFIRMED since we're using walletsolidity endpoints
+            status: 'CONFIRMED',
+            webhookStatus: 'PENDING'
+          }
+        },
+        { upsert: true }
+      );
 
-      // Save to DB
-      await this.txModel.create({
-        txHash, // unique index was added to prevent duplicates
-        from,
-        to,
-        amount: formattedAmount,
-        blockNumber: tx.blockNumber,
-      });
-
-      this.logger.log({ tx, to, from, formattedAmount })
+      this.logger.log(`TX ${txHash} | ${from} -> ${to} | ${formattedAmount} USDT`);
 
     } catch (err) {
       this.logger.error('TX processing error', err);
     }
   }
 
-  private async confirmTransactions(latestBlock: number) {
-    const CONFIRMATION_THRESHOLD = 19;
-    const BATCH_SIZE = 100;
 
-    const pendingTxs = await this.txModel.find({
-      status: 'PENDING',
-      blockNumber: { $lte: latestBlock - CONFIRMATION_THRESHOLD }
-    })
-      .limit(BATCH_SIZE);
 
-    if (pendingTxs.length === 0) return;
 
-    await this.txModel.bulkWrite(
-      pendingTxs.map(tx => ({
-        updateOne: {
-          filter: { txHash: tx.txHash },
-          update: { $set: { status: 'CONFIRMED' } }
-        }
-      }))
-    );
 
-    // process side effects after
-    for (const tx of pendingTxs) {
-      // await this.txModel.updateOne(
-      //   { txHash: tx.txHash },
-      //   { status: 'CONFIRMED' }
-      // );
 
-      //await this.sendWebhook(tx); // confirmed event
-    }
-  }
+
+
+
+
+
+
+  // Confirmation logic - used when using wallet endpoints to mark transactions as confirmed after 20 blocks. Not needed id using walletsolidity endpoints as they return already confirmed transactions.
+
+  // private startConfirmer() {
+  //   setInterval(() => this.runConfirmation(), 10000); // every 10s (tunable)
+  // }
+
+  // private isConfirming = false;
+
+  // private async runConfirmation() {
+  //   if (this.isConfirming) return;
+  //   this.isConfirming = true;
+
+  //   try {
+  //     const latestBlock = await this.getLatestBlockNumber();
+  //     await this.confirmTransactions(latestBlock);
+  //   } catch (err) {
+  //     this.logger.error('Confirmation error', err);
+  //   } finally {
+  //     this.isConfirming = false;
+  //   }
+  // }
+
+  // private async confirmTransactions(latestBlock: number) {
+  //   const CONFIRMATION_THRESHOLD = 19;
+  //   const BATCH_SIZE = 100;
+
+  //   const pendingTxs = await this.txModel.find({
+  //     status: 'PENDING',
+  //     blockNumber: { $lte: latestBlock - CONFIRMATION_THRESHOLD }
+  //   })
+  //     .limit(BATCH_SIZE);
+
+  //   if (pendingTxs.length === 0) return;
+
+  //   await this.txModel.bulkWrite(
+  //     pendingTxs.map(tx => ({
+  //       updateOne: {
+  //         filter: { txHash: tx.txHash },
+  //         update: { $set: { status: 'CONFIRMED' } }
+  //       }
+  //     }))
+  //   );
+
+  //   // process side effects after
+  //   for (const tx of pendingTxs) {
+  //     // await this.txModel.updateOne(
+  //     //   { txHash: tx.txHash },
+  //     //   { status: 'CONFIRMED' }
+  //     // );
+
+  //     //await this.sendWebhook(tx); // confirmed event
+  //   }
+  // }
 }
