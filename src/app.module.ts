@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { TronPollingModule } from './tron-polling/tron-polling.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { WebhookingModule } from './webhooking/webhooking.module';
 
 @Module({
   imports: [
@@ -14,7 +15,8 @@ import { MongooseModule } from '@nestjs/mongoose';
       }),
       inject: [ConfigService],
     }),
-    TronPollingModule
+    TronPollingModule,
+    WebhookingModule
   ],
   controllers: [AppController],
   providers: [AppService],

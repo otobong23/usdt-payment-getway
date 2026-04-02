@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TronPollingService } from './tron-polling.service';
-import { TronPollingController } from './tron-polling.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BlockTracker, BlockTrackerSchema } from './schema/tron-polling.schema';
 import { TronTransaction, TronTransactionSchema } from './schema/tron-transactions.schema';
@@ -12,7 +11,7 @@ import { TronTransaction, TronTransactionSchema } from './schema/tron-transactio
       { name: TronTransaction.name, schema: TronTransactionSchema },
     ]),
   ],
-  controllers: [TronPollingController],
+  controllers: [],
   providers: [TronPollingService],
 })
 export class TronPollingModule {}

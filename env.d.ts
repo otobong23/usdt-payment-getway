@@ -8,6 +8,9 @@ declare namespace NodeJS {
 
     TRON_API_KEY: string;
 
+    WEBHOOK_URL: string;
+    WEBHOOK_SECRET: string;
+
     NODE_ENV: "development" | "production" | "test";
   }
 }
