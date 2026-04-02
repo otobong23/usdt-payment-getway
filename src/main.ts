@@ -27,12 +27,6 @@ async function bootstrap() {
     }),
   );
 
-  app.enableCors({
-    origin: ['http://localhost:3000', 'https://ferrix.app', 'https://www.ferrix.app'], // allow requests from your frontend
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    credentials: true,               // allow cookies/auth headers if needed
-  });
-
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // strips properties not in the DTO
