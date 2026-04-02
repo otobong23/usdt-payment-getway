@@ -11,7 +11,7 @@ export const ENVIRONMENT = {
   // },
 
   CONNECTION: {
-    PORT: process.env.PORT,
+    PORT: process.env.PORT || 8080,
     MONGO_DB: process.env.MONGO_DB,
   },
 

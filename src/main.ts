@@ -4,9 +4,8 @@ import { AppModule } from './app.module';
 import { config } from 'dotenv';
 import * as bodyParser from 'body-parser';
 import { ENVIRONMENT } from './common/constant/enivronment/enviroment';
-config()
 
-const port = ENVIRONMENT.CONNECTION.PORT || 4000;
+const PORT = ENVIRONMENT.CONNECTION.PORT;
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -35,6 +34,6 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(PORT, '0.0.0.0');
 }
 bootstrap();
