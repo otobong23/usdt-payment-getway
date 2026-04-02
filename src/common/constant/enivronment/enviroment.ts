@@ -17,5 +17,7 @@ export const ENVIRONMENT = {
 
   TRON: {
     API_KEY: process.env.TRON_API_KEY,
-  }
+  },
+  
+  WALLET_ADDRESS: 'TXGCn6nh4Ar9gcJ2KEXHHLD3mUUX98UGGZ'
 };
