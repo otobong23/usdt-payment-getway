@@ -45,9 +45,9 @@ export class WebhookingService implements OnModuleInit {
         webhookAttempts: { $lt: 5 }
       }).limit(50);
 
-      for (const tx of txs) {
-        await this.sendWebhook(tx, ENVIRONMENT.WEBHOOK.URL);
-      }
+      await Promise.allSettled(
+        txs.map(tx => this.sendWebhook(tx, ENVIRONMENT.WEBHOOK.URL))
+      );
 
     } catch (err) {
       this.logger.error('Webhook worker error', err);
@@ -59,7 +59,7 @@ export class WebhookingService implements OnModuleInit {
   private async sendWebhook(tx: TronTransactionDocument, webhookUrl: string) {
     try {
       const payload = {
-        event: 'deposit.confirmed',
+        event: 'confirmed',
         data: {
           txHash: tx.txHash,
           from: tx.from,
@@ -87,7 +87,7 @@ export class WebhookingService implements OnModuleInit {
 
       this.logger.log(`Webhook sent: ${tx.txHash}`);
 
-    } catch (err) {
+    } catch (err: any) {
       await this.txModel.updateOne(
         { txHash: tx.txHash },
         {
