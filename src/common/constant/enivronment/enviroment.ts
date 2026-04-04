@@ -17,7 +17,7 @@ export const ENVIRONMENT = {
 
   TRON: {
     API_KEY: process.env.TRON_API_KEY,
-    USDT_CONTRACT: 'TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj',
+    USDT_CONTRACT: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
     USDT_CONTRACT_HEX: '41a614f803b6fd780986a42c78ec9c7f77e6ded13c'
   },
   
