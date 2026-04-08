@@ -96,7 +96,7 @@ export class TronPollingService implements OnModuleInit {
     setInterval(() => this.run(), 5000); // every 5 seconds
   }
 
-  
+
 
   private isRunning = false;
 
@@ -180,13 +180,13 @@ export class TronPollingService implements OnModuleInit {
       const to = this.toBase58(decoded.to);
       const from = this.toBase58(value.owner_address);
 
-      this.logger.log({ to, from, amount: this.formatUSDT(decoded.amount)})
-
       // ✅ Only our wallet
       if (to !== this.walletAddress) return;
 
       const rawAmount = decoded.amount;
       const formattedAmount = this.formatUSDT(rawAmount);
+
+      this.logger.log({ to, from, amount: formattedAmount })
 
       // ✅ Idempotent insert
       await this.txModel.updateOne(
