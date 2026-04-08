@@ -23,168 +23,137 @@ export class BscPollingService implements OnModuleInit {
   // CONFIG
   // =========================
 
-  private walletAddress = ENVIRONMENT.WALLET_ADDRESS;
+  private readonly walletAddress =
+    ENVIRONMENT.WALLET_ADDRESS.USDT_BEP20.toLowerCase();
 
-  private USDT_CONTRACT = '0x55d398326f99059fF775485246999027B3197955';
+  private readonly USDT_CONTRACT =
+    '0x55d398326f99059fF775485246999027B3197955';
 
-  private provider = new ethers.JsonRpcProvider(
-   //  'https://eth-mainnet.g.alchemy.com/v2/XP302vYQy17Ra53jsYeSdXdQMKiqxB0K',
-   'https://rpc.ankr.com/bsc/aa28c69d077e55ed537ee5b470ae39f2104813370664499c21768f371260d242'
+  private readonly provider = new ethers.JsonRpcProvider(
+    'https://rpc.ankr.com/bsc/2219885ad4ad8559547e97dfce1c791cb8cce13906b4517ce5f40204c665a04a',
   );
 
-  private wsProvider = new ethers.WebSocketProvider(
-    'wss://bsc-rpc.publicnode.com'
-  );
-
-  private abi = [
+  private readonly iface = new ethers.Interface([
     'event Transfer(address indexed from, address indexed to, uint256 value)',
-  ];
+  ]);
 
-  private contract = new ethers.Contract(
-    this.USDT_CONTRACT,
-    this.abi,
-    this.wsProvider,
-  );
+  private readonly CONFIRMATIONS = 3;
+  private readonly BATCH_SIZE = 50;
+  private readonly INTERVAL = 15000;
+
+  private isRunning = false;
 
   // =========================
   // INIT
   // =========================
 
-  onModuleInit() {
-    this.startListener();
-    this.startBackfill(); // fallback polling
+  async onModuleInit() {
+    this.logger.log('🚀 BSC Polling Service Started');
+    setInterval(() => this.run(), this.INTERVAL);
   }
 
   // =========================
-  // REAL-TIME LISTENER (BEST)
+  // MAIN LOOP (SOURCE OF TRUTH)
   // =========================
 
-  private startListener() {
-    this.logger.log('Starting BSC real-time listener...');
-
-    this.contract.on(
-      'Transfer',
-      async (from, to, value, event) => {
-        try {
-          const txHash = event.log.transactionHash;
-
-          // only incoming to our wallet
-          if (to.toLowerCase() !== this.walletAddress.toLowerCase()) return;
-
-          const amount = ethers.formatUnits(value, 18);
-
-          await this.txModel.updateOne(
-            { txHash },
-            {
-              $setOnInsert: {
-                from,
-                to,
-                amount,
-                txHash,
-                blockNumber: event.log.blockNumber,
-                status: 'CONFIRMED',
-                webhookStatus: 'PENDING',
-              },
-            },
-            { upsert: true },
-          );
-
-          this.logger.log(
-            `BSC TX ${txHash} | ${from} -> ${to} | ${amount} USDT`,
-          );
-        } catch (err) {
-          this.logger.error('Listener error', err);
-        }
-      },
-    );
-  }
-
-  // =========================
-  // BACKUP INDEXER (POLL LOGS)
-  // =========================
-
-  private isRunning = false;
-
-  private async startBackfill() {
-    setInterval(() => this.runBackfill(), 20000);
-  }
-
-  private async runBackfill() {
+  private async run() {
     if (this.isRunning) return;
     this.isRunning = true;
 
     try {
-      const latest = await this.provider.getBlockNumber();
+      const latestBlock = await this.provider.getBlockNumber();
+      const safeBlock = latestBlock - this.CONFIRMATIONS;
 
       const tracker = await this.getTracker();
-      let lastBlock = tracker.lastProcessedBlock || latest - 10;
 
-      if (lastBlock >= latest) return;
+      let fromBlock = tracker.lastProcessedBlock || safeBlock - 20;
+
+      if (fromBlock >= safeBlock) return;
+
+      const toBlock = Math.min(fromBlock + this.BATCH_SIZE, safeBlock);
+
+      this.logger.log(`Scanning blocks ${fromBlock} → ${toBlock}`);
 
       const logs = await this.provider.getLogs({
         address: this.USDT_CONTRACT,
-        fromBlock: lastBlock + 1,
-        toBlock: Math.min(lastBlock + 50, latest),
-        topics: [
-          ethers.id('Transfer(address,address,uint256)'),
-        ],
+        fromBlock,
+        toBlock,
+        topics: [ethers.id('Transfer(address,address,uint256)')],
       });
 
       for (const log of logs) {
-        const parsed = this.contract.interface.parseLog(log);
-        if (!parsed || !parsed.args) continue;
-
-        const from = parsed.args.from;
-        const to = parsed.args.to;
-        const value = parsed.args.value;
-
-        if (to.toLowerCase() !== this.walletAddress.toLowerCase()) continue;
-
-        const txHash = log.transactionHash;
-
-        const amount = ethers.formatUnits(value, 18);
-
-        await this.txModel.updateOne(
-          { txHash },
-          {
-            $setOnInsert: {
-              from,
-              to,
-              amount,
-              txHash,
-              blockNumber: log.blockNumber,
-              status: 'CONFIRMED',
-              webhookStatus: 'PENDING',
-            },
-          },
-          { upsert: true },
-        );
-
-        this.logger.log(
-          `BACKFILL TX ${txHash} | ${amount} USDT`,
-        );
+        await this.processLog(log);
       }
 
-      await this.updateLastBlock(
-        Math.min(lastBlock + 50, latest),
-      );
+      await this.updateLastBlock(toBlock);
     } catch (err) {
-      this.logger.error('Backfill error', err);
+      this.logger.error('Polling error', err);
     } finally {
       this.isRunning = false;
     }
   }
 
   // =========================
-  // TRACKER (same idea as TRON)
+  // PROCESS LOG
+  // =========================
+
+  private async processLog(log: ethers.Log) {
+    try {
+      const parsed = this.iface.parseLog(log);
+      if (!parsed) return;
+
+      const from = parsed.args.from.toLowerCase();
+      const to = parsed.args.to.toLowerCase();
+      const value = parsed.args.value;
+      
+      
+      if (to !== this.walletAddress) return;
+      
+      this.logger.log({from, to, value})
+
+      const txHash = log.transactionHash;
+      const uniqueId = `${txHash}_${log.index}`;
+
+      const amount = ethers.formatUnits(value, 18);
+
+      await this.txModel.updateOne(
+        { uniqueId },
+        {
+          $setOnInsert: {
+            uniqueId,
+            txHash,
+            from,
+            to,
+            amount,
+            blockNumber: log.blockNumber,
+            status: 'CONFIRMED',
+            webhookStatus: 'PENDING',
+          },
+        },
+        { upsert: true },
+      );
+
+      this.logger.log(
+        `💰 ${amount} USDT | ${from} → ${to} | ${txHash}`,
+      );
+    } catch (err) {
+      this.logger.error('Log processing error', err);
+    }
+  }
+
+  // =========================
+  // TRACKER
   // =========================
 
   private async getTracker() {
-    return (
-      (await this.blockTrackerModel.findOne({ chain: 'bsc' })) || {
-        lastProcessedBlock: 0,
-      }
-    );
+    const tracker = await this.blockTrackerModel.findOne({ chain: 'bsc' });
+
+    if (!tracker) {
+      const latest = await this.provider.getBlockNumber();
+      return { lastProcessedBlock: latest - 20 };
+    }
+
+    return tracker;
   }
 
   private async updateLastBlock(blockNumber: number) {

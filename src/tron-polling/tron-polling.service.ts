@@ -16,7 +16,7 @@ export class TronPollingService implements OnModuleInit {
     @InjectModel(TronTransaction.name) private readonly txModel: Model<TronTransactionDocument>
   ) { }
 
-  private walletAddress = ENVIRONMENT.WALLET_ADDRESS
+  private walletAddress = ENVIRONMENT.WALLET_ADDRESS.USDT_TRC20
 
   private authFeth = axios.create({
     baseURL: TronGridBaseUrl,
