@@ -180,6 +180,8 @@ export class TronPollingService implements OnModuleInit {
       const to = this.toBase58(decoded.to);
       const from = this.toBase58(value.owner_address);
 
+      this.logger.log({ to, from, amount: this.formatUSDT(decoded.amount)})
+
       // ✅ Only our wallet
       if (to !== this.walletAddress) return;
 
