@@ -213,6 +213,20 @@ export class TronPollingService implements OnModuleInit {
     }
   }
 
+  async resetIndexer() {
+    const latest = await this.getLatestBlockNumber();
+    const startBlock = latest - 20;
+
+    await this.blockTrackerModel.deleteOne({ chain: 'tron' });
+
+    await this.blockTrackerModel.create({
+      chain: 'tron',
+      lastProcessedBlock: startBlock,
+    });
+
+    return { message: 'Indexer reset', startBlock };
+  }
+
 
 
 

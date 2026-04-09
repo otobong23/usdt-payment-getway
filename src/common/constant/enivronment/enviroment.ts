@@ -31,5 +31,9 @@ export const ENVIRONMENT = {
     SECRET: process.env.WEBHOOK_SECRET
   },
 
+  ADMIN: {
+    PASSWORD: process.env.ADMIN_PASSWORD
+  },
+
   NODE_ENV: process.env.NODE_ENV || 'development'
 };

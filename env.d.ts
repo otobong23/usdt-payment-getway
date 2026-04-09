@@ -11,6 +11,8 @@ declare namespace NodeJS {
     WEBHOOK_URL: string;
     WEBHOOK_SECRET: string;
 
+    ADMIN_PASSWORD: string;
+    
     NODE_ENV: "development" | "production" | "test";
   }
 }

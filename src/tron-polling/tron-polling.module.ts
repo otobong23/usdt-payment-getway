@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { BlockTracker, BlockTrackerSchema } from './schema/tron-polling.schema';
 import { TronTransaction, TronTransactionSchema } from './schema/tron-transactions.schema';
 import { BscPollingService } from './bsc-polling.service';
+import { PollingController } from './polling.controller';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { BscPollingService } from './bsc-polling.service';
       { name: TronTransaction.name, schema: TronTransactionSchema },
     ]),
   ],
-  controllers: [],
+  controllers: [PollingController],
   providers: [TronPollingService, BscPollingService],
 })
 export class TronPollingModule {}

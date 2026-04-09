@@ -6,8 +6,9 @@ import { ethers } from 'ethers';
 import { BlockTracker, BlockTrackerDocument } from './schema/tron-polling.schema';
 import { TronTransaction, TronTransactionDocument } from './schema/tron-transactions.schema';
 import { ENVIRONMENT } from 'src/common/constant/enivronment/enviroment';
+import pLimit from 'p-limit'
 
-const YOUR_TX_BLOCK = 91557591
+
 
 @Injectable()
 export class BscPollingService implements OnModuleInit {
@@ -54,16 +55,36 @@ export class BscPollingService implements OnModuleInit {
 
   private readonly MAX_DRIFT = 5000;
 
-  private isRunning = false;
 
+
+  private isRunning = false;
+  private isBehind = false;
+
+
+  
   // =========================
   // INIT
   // =========================
 
   async onModuleInit() {
     this.logger.log('🚀 BSC Polling Service Started');
-    setInterval(() => this.run(), this.INTERVAL);
+    this.loop();
   }
+
+  private async loop() {
+    while (true) {
+      try {
+        await this.run();
+      } catch (err) {
+        this.logger.error('Loop error', err);
+      }
+
+      const delay = this.isBehind ? 5000 : this.INTERVAL;
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+
+
 
   // =========================
   // MAIN LOOP (SOURCE OF TRUTH)
@@ -80,6 +101,7 @@ export class BscPollingService implements OnModuleInit {
       const tracker = await this.getTracker();
 
       let fromBlock = tracker.lastProcessedBlock;
+
 
       // If no tracker → initialize properly
       if (!fromBlock) {
@@ -111,7 +133,17 @@ export class BscPollingService implements OnModuleInit {
         await this.updateLastBlock(resetBlock); // ✅ persist
       }
 
-      const toBlock = Math.min(fromBlock + this.BATCH_SIZE, safeBlock);
+
+      const lag = safeBlock - fromBlock;
+      this.isBehind = lag > 200;
+      let batchSize = this.BATCH_SIZE;
+
+      // 🚀 Catch-up mode
+      if (lag > 200) batchSize = 500;
+      if (lag > 1000) batchSize = 1000;
+      if (lag > 5000) batchSize = 2000;
+
+      const toBlock = Math.min(fromBlock + batchSize, safeBlock);
 
       this.logger.log(`Scanning blocks ${fromBlock} → ${toBlock}`);
 
@@ -131,9 +163,11 @@ export class BscPollingService implements OnModuleInit {
       // this.logger.log(`paddedWallet: ${this.paddedWallet}`);
       // this.logger.log(`transferTopic: ${this.transferTopic}`);
 
-      for (const log of logs) {
-        await this.processLog(log);
-      }
+      const limit = pLimit(20); // adjust (5–20)
+
+      await Promise.all(
+        logs.map(log => limit(() => this.processLog(log)))
+      );
 
       // Always move forward safely
       const newLastBlock = Math.min(toBlock, safeBlock);
@@ -152,6 +186,8 @@ export class BscPollingService implements OnModuleInit {
     }
   }
 
+
+
   // =========================
   // PROCESS LOG
   // =========================
@@ -159,7 +195,9 @@ export class BscPollingService implements OnModuleInit {
   private async processLog(log: ethers.Log) {
     try {
 
-      this.logger.log('log: ', log)
+      if (ENVIRONMENT.NODE_ENV !== 'production') {
+        this.logger.log(log);
+      }
 
       const parsed = this.iface.parseLog(log);
       if (!parsed) return;
@@ -171,10 +209,11 @@ export class BscPollingService implements OnModuleInit {
       // if (to !== this.walletAddress) return;   // This part is unnecessary
 
       const txHash = log.transactionHash;
-
       const amount = ethers.formatUnits(value, 18);    //  BSC USDT uses 18 decimals
 
       this.logger.log({ from, to, amount })
+
+      // const uniqueId = `${txHash}_${log.index}`;
 
       await this.txModel.updateOne(
         { txHash },
@@ -230,5 +269,19 @@ export class BscPollingService implements OnModuleInit {
       { lastProcessedBlock: blockNumber },
       { upsert: true },
     );
+  }
+
+  async resetIndexer() {
+    const latest = await this.provider.getBlockNumber();
+    const startBlock = latest - 20;
+
+    await this.blockTrackerModel.deleteOne({ chain: 'bsc' });
+
+    await this.blockTrackerModel.create({
+      chain: 'bsc',
+      lastProcessedBlock: startBlock,
+    });
+
+    return { message: 'Indexer reset', startBlock };
   }
 }
