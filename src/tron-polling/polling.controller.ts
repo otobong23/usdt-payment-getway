@@ -1,13 +1,13 @@
 import { ConflictException, Controller, Post, Query } from '@nestjs/common';
 import { BscPollingService } from './bsc-polling.service';
-import { TronPollingService } from './tron-polling.service';
+// import { TronPollingService } from './tron-polling.service';
 import { ENVIRONMENT } from 'src/common/constant/enivronment/enviroment';
 
 @Controller('polling')
 export class PollingController {
    constructor(
       private readonly bscPollingService: BscPollingService,
-      private readonly tronPollingService: TronPollingService
+      // private readonly tronPollingService: TronPollingService
    ) {}
 
    adminPassword = ENVIRONMENT.ADMIN.PASSWORD
@@ -19,7 +19,7 @@ export class PollingController {
       }
 
       if (chain === 'bsc') return this.bscPollingService.resetIndexer();
-      else if(chain === 'tron') return this.tronPollingService
-      else throw new ConflictException('Invalid chain type; indicate tron or bsc')
+      // else if(chain === 'tron') return this.tronPollingService
+      else throw new ConflictException('Invalid chain type; indicate bsc')
    }
 }
